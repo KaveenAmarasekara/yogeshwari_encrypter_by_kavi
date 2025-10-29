@@ -27,10 +27,7 @@ jobs:
       - name: Full pipeline round-trip test (Ubuntu)
         run: |
           TMPMSG="Hello from CI pipeline test"
-          printf "%s\n" "abyss" "B16" "1" "$TMPMSG" "" "" "message_ci.bmp" \
-            "2" "message_ci.bmp" "carrier_ci.wav" \
-            "3" "carrier_ci.wav" "waveform_ci.bmp" \
-            "4" "waveform_ci.bmp" "decoded_ci.txt" "5" | ./yogeshwari_encrypter_kavi
+          ./yogeshwari_encrypter_kavi --ci --ci-text "$TMPMSG"
           if ! grep -q "$TMPMSG" decoded_ci.txt; then
             echo "Round-trip payload mismatch"; exit 1
           fi
@@ -79,15 +76,7 @@ jobs:
         shell: powershell
         run: |
           $msg = "Hello from CI pipeline test"
-          $input = @(
-            'abyss', 'B16', '1', $msg, '', '', 'message_ci.bmp',
-            '2', 'message_ci.bmp', 'carrier_ci.wav',
-            '3', 'carrier_ci.wav', 'waveform_ci.bmp',
-            '4', 'waveform_ci.bmp', 'decoded_ci.txt',
-            '5'
-          ) -join "`n"
-          $input += "`n"
-          $input | .\yogeshwari_encrypter_kavi.exe
+          .\yogeshwari_encrypter_kavi.exe --ci --ci-text "$msg"
           if (-not (Get-Content decoded_ci.txt | Select-String -Pattern [regex]::Escape($msg))) {
             Write-Error "Round-trip payload mismatch on Windows"
             exit 1

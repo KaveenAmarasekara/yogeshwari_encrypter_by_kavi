@@ -1494,12 +1494,117 @@ void decodeFromWaveformOption() {
     }
 }
 
-int main(){
+int main(int argc, char** argv){
     // Keep C and C++ IO synced to avoid subtle console input/echo issues on Windows
     ios::sync_with_stdio(true);
     // Tie cin to cout so prompts (without newline) are flushed before input reads.
     cin.tie(&cout);
     // Animated header and simple login
+    // Simple CLI mode: if flags are provided, run non-interactively and exit.
+    auto getArgValFrom = [&](int argc, char** argv, const string &flag)->string{
+        for(int i=1;i<argc;++i){ if(string(argv[i])==flag && i+1<argc) return string(argv[i+1]); }
+        return string();
+    };
+
+    auto hasArg = [&](int argc, char** argv, const string &flag)->bool{
+        for(int i=1;i<argc;++i) if(string(argv[i])==flag) return true; return false;
+    };
+
+    auto runNonInteractive = [&](int argc, char** argv)->int{
+        // --render-text <text> --out-bmp <file>
+        if(hasArg(argc, argv, "--render-text")){
+            string txt = getArgValFrom(argc, argv, "--render-text");
+            string out = getArgValFrom(argc, argv, "--out-bmp");
+            if(out.empty()) out = "message_ci.bmp";
+            if(!renderTextToBMP(txt, out)){
+                cerr << "CLI: renderTextToBMP failed\n"; return 2;
+            }
+            return 0;
+        }
+        // --bmp-to-wav <in> --out-wav <out>
+        if(hasArg(argc, argv, "--bmp-to-wav")){
+            string in = getArgValFrom(argc, argv, "--bmp-to-wav");
+            string out = getArgValFrom(argc, argv, "--out-wav"); if(out.empty()) out = "carrier_ci.wav";
+            vector<uint8_t> payload;
+            if(!readAllFile(in, payload)){ cerr<<"CLI: failed to read BMP file: "<<in<<"\n"; return 3; }
+            if(!writeWAV_LSBCarrier(out, payload)){ cerr<<"CLI: failed to write WAV file: "<<out<<"\n"; return 4; }
+            return 0;
+        }
+        // --wav-to-waveform <in> --out-img <out>
+        if(hasArg(argc, argv, "--wav-to-waveform")){
+            string in = getArgValFrom(argc, argv, "--wav-to-waveform");
+            string out = getArgValFrom(argc, argv, "--out-img"); if(out.empty()) out = "waveform_ci.bmp";
+            // default to BMP for reliability
+            if(!generateWaveformBMPWithPayload(in, out)){ cerr<<"CLI: failed to create waveform image\n"; return 5; }
+            return 0;
+        }
+        // --decode-image <in> --out-text <out>
+        if(hasArg(argc, argv, "--decode-image")){
+            string in = getArgValFrom(argc, argv, "--decode-image");
+            string out = getArgValFrom(argc, argv, "--out-text"); if(out.empty()) out = "decoded_ci.txt";
+            vector<uint8_t> payload;
+            bool ok = false;
+            // try BMP then PNG
+            if(decodePayloadFromBMP(in, payload)) ok = true;
+            else if(decodePayloadFromPNG(in, payload)) ok = true;
+            if(!ok){ cerr<<"CLI: failed to decode payload from image: "<<in<<"\n"; return 6; }
+            // if payload looks like BMP, try to extract text
+            if(payload.size()>=2 && payload[0]=='B' && payload[1]=='M'){
+                string tmp = out + ".tmp.bmp";
+                FILE *tf = fopen(tmp.c_str(), "wb"); if(!tf){ cerr<<"CLI: failed to write tmp bmp\n"; return 7; }
+                fwrite(payload.data(),1,payload.size(),tf); fclose(tf);
+                int W=0,H=0; vector<uint8_t> rgb;
+                if(readBMP24_pixels(tmp, W, H, rgb)){
+                    string recovered;
+                    if(extractTextFromRenderedBMP(W,H,rgb,recovered)){
+                        FILE *f = fopen(out.c_str(), "wb"); if(!f){ cerr<<"CLI: failed to open out file\n"; return 8; }
+                        fwrite(recovered.c_str(),1,recovered.size(),f); fclose(f);
+                        return 0;
+                    }
+                }
+                // fallback: write raw payload
+            }
+            FILE *f = fopen(out.c_str(), "wb"); if(!f){ cerr<<"CLI: failed to open out file\n"; return 9; }
+            fwrite(payload.data(),1,payload.size(),f); fclose(f);
+            return 0;
+        }
+        // --ci [--ci-text <text>] : run full pipeline with fixed filenames and verify
+        if(hasArg(argc, argv, "--ci")){
+            string msg = getArgValFrom(argc, argv, "--ci-text"); if(msg.empty()) msg = "Hello from CI pipeline test";
+            string bmp = "message_ci.bmp";
+            string wav = "carrier_ci.wav";
+            string img = "waveform_ci.bmp";
+            string outtxt = "decoded_ci.txt";
+            if(!renderTextToBMP(msg, bmp)){ cerr<<"CI: render failed\n"; return 20; }
+            vector<uint8_t> payload; if(!readAllFile(bmp,payload)){ cerr<<"CI: read bmp failed\n"; return 21; }
+            if(!writeWAV_LSBCarrier(wav, payload)){ cerr<<"CI: write wav failed\n"; return 22; }
+            if(!generateWaveformBMPWithPayload(wav, img)){ cerr<<"CI: waveform failed\n"; return 23; }
+            // decode
+            vector<uint8_t> pl; if(!decodePayloadFromBMP(img, pl) && !decodePayloadFromPNG(img, pl)){ cerr<<"CI: decode image failed\n"; return 24; }
+            // if BMP payload, try extract
+            if(pl.size()>=2 && pl[0]=='B' && pl[1]=='M'){
+                string tmp = "ci_payload.bmp"; FILE *tf = fopen(tmp.c_str(), "wb"); if(tf){ fwrite(pl.data(),1,pl.size(),tf); fclose(tf);
+                    int W=0,H=0; vector<uint8_t> rgb; if(readBMP24_pixels(tmp,W,H,rgb)){
+                        string rec; if(extractTextFromRenderedBMP(W,H,rgb,rec)){
+                            // compare
+                            if(rec.find(msg) != string::npos){ FILE *f=fopen(outtxt.c_str(),"wb"); if(f){ fwrite(rec.c_str(),1,rec.size(),f); fclose(f); return 0; } }
+                        }
+                    }
+                }
+            }
+            // fallback: write raw payload to outtxt and fail
+            FILE *f = fopen(outtxt.c_str(), "wb"); if(!f){ cerr<<"CI: cannot write outtxt\n"; return 25; }
+            fwrite(pl.data(),1,pl.size(),f); fclose(f);
+            // verify content contains message
+            string s; FILE *rf = fopen(outtxt.c_str(), "rb"); if(rf){ fseek(rf,0,SEEK_END); long sz=ftell(rf); fseek(rf,0,SEEK_SET); vector<char> buf(sz>0?sz:0); if(sz>0) fread(buf.data(),1,sz,rf); fclose(rf); s.assign(buf.begin(), buf.end()); }
+            if(s.find(msg) != string::npos) return 0;
+            cerr<<"CI: round-trip mismatch\n"; return 26;
+        }
+        return -1; // no CLI flags matched
+    };
+
+    // If argv contains flags, run non-interactive and exit
+    // We'll examine actual argc/argv below (main parameters)
     auto typewriter = [&](const string &s, int ms=6){
         for(char c: s){ cout << c; cout.flush(); this_thread::sleep_for(chrono::milliseconds(ms)); }
     };
@@ -1600,6 +1705,11 @@ int main(){
         if(!color.empty() || bold) cout << reset;
         cout << "\n";
     };
+
+    // If CLI flags are present, run non-interactively and exit early.
+    // Call runNonInteractive defined above.
+    int cliResult = runNonInteractive(argc, argv);
+    if(cliResult != -1) return cliResult;
 
     // Fancy FIGlet-style animated header with green hacking vibe
     cout << "\n";
