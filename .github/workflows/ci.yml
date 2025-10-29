@@ -16,9 +16,50 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y g++ make
       - name: Build
         run: g++ -std=c++17 -O2 yogeshwari_encrypter_kavi.cpp -o yogeshwari_encrypter_kavi
+      - name: Upload Linux build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yogeshwari_encrypter_kavi-linux
+          path: yogeshwari_encrypter_kavi
       - name: Smoke test (non-interactive)
         run: |
           printf "abyss\nB16\n5\n" | ./yogeshwari_encrypter_kavi
+      - name: Full pipeline round-trip test (Ubuntu)
+        run: |
+          TMPMSG="Hello from CI pipeline test"
+          cat > full_input.txt <<'EOF'
+abyss
+B16
+1
+$TMPMSG
+
+
+message_ci.bmp
+2
+message_ci.bmp
+carrier_ci.wav
+3
+carrier_ci.wav
+waveform_ci.bmp
+4
+waveform_ci.bmp
+decoded_ci.txt
+5
+EOF
+          printf "%s" "$(cat full_input.txt)" | ./yogeshwari_encrypter_kavi
+          if ! grep -q "$TMPMSG" decoded_ci.txt; then
+            echo "Round-trip payload mismatch"; exit 1
+          fi
+          echo "Round-trip verified: decoded text contains expected message"
+      - name: Upload artifacts (output files)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-output-files-linux
+          path: |
+            message_ci.bmp
+            carrier_ci.wav
+            waveform_ci.bmp
+            decoded_ci.txt
 
   build-windows:
     runs-on: windows-latest
@@ -41,7 +82,39 @@ jobs:
         shell: powershell
         run: |
           g++ -std=c++17 -O2 yogeshwari_encrypter_kavi.cpp -o yogeshwari_encrypter_kavi.exe
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: yogeshwari_encrypter_kavi-windows
+          path: yogeshwari_encrypter_kavi.exe
       - name: Smoke test (non-interactive)
         shell: powershell
         run: |
           $in = "abyss`nB16`n5`n"; $in | .\yogeshwari_encrypter_kavi.exe
+      - name: Full pipeline round-trip test (Windows)
+        shell: powershell
+        run: |
+          $msg = "Hello from CI pipeline test"
+          $input = @(
+            'abyss', 'B16', '1', $msg, '', '', 'message_ci.bmp',
+            '2', 'message_ci.bmp', 'carrier_ci.wav',
+            '3', 'carrier_ci.wav', 'waveform_ci.bmp',
+            '4', 'waveform_ci.bmp', 'decoded_ci.txt',
+            '5'
+          ) -join "`n"
+          $input += "`n"
+          $input | .\yogeshwari_encrypter_kavi.exe
+          if (-not (Get-Content decoded_ci.txt | Select-String -Pattern [regex]::Escape($msg))) {
+            Write-Error "Round-trip payload mismatch on Windows"
+            exit 1
+          }
+          Write-Host "Round-trip verified on Windows"
+      - name: Upload artifacts (output files)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-output-files-windows
+          path: |
+            message_ci.bmp
+            carrier_ci.wav
+            waveform_ci.bmp
+            decoded_ci.txt

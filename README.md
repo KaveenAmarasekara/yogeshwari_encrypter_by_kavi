@@ -1,5 +1,7 @@
 # Yogeshwari Encrypter (multimedia steganography)
 
+[![CI](https://github.com/KaveenAmarasekara/yogeshwari_encrypter_by_kavi/actions/workflows/ci.yml/badge.svg)](https://github.com/KaveenAmarasekara/yogeshwari_encrypter_by_kavi/actions)
+
 Single-file C++ steganography demo and toolkit.
 
 Features
