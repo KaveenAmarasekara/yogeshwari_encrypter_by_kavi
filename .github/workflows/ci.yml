@@ -27,26 +27,10 @@ jobs:
       - name: Full pipeline round-trip test (Ubuntu)
         run: |
           TMPMSG="Hello from CI pipeline test"
-          cat > full_input.txt <<'EOF'
-abyss
-B16
-1
-$TMPMSG
-
-
-message_ci.bmp
-2
-message_ci.bmp
-carrier_ci.wav
-3
-carrier_ci.wav
-waveform_ci.bmp
-4
-waveform_ci.bmp
-decoded_ci.txt
-5
-EOF
-          printf "%s" "$(cat full_input.txt)" | ./yogeshwari_encrypter_kavi
+          printf "%s\n" "abyss" "B16" "1" "$TMPMSG" "" "" "message_ci.bmp" \
+            "2" "message_ci.bmp" "carrier_ci.wav" \
+            "3" "carrier_ci.wav" "waveform_ci.bmp" \
+            "4" "waveform_ci.bmp" "decoded_ci.txt" "5" | ./yogeshwari_encrypter_kavi
           if ! grep -q "$TMPMSG" decoded_ci.txt; then
             echo "Round-trip payload mismatch"; exit 1
           fi
