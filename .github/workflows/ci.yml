@@ -79,7 +79,8 @@ jobs:
         run: |
           $msg = "Hello from CI pipeline test"
           .\yogeshwari_encrypter_kavi.exe --ci --ci-text "$msg"
-          if (-not (Get-Content decoded_ci.txt | Select-String -Pattern [regex]::Escape($msg))) {
+          $content = Get-Content decoded_ci.txt -Raw -ErrorAction SilentlyContinue
+          if (-not ($content -match [regex]::Escape($msg))) {
             Write-Error "Round-trip payload mismatch on Windows"
             exit 1
           }
