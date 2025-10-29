@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build deps
+        run: sudo apt-get update && sudo apt-get install -y g++ make
+      - name: Build
+        run: g++ -std=c++17 -O2 yogeshwari_encrypter_kavi.cpp -o yogeshwari_encrypter_kavi
+      - name: Smoke test (non-interactive)
+        run: |
+          printf "abyss\nB16\n5\n" | ./yogeshwari_encrypter_kavi
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install MinGW (Chocolatey)
+        shell: powershell
+        run: |
+          choco install mingw -y || true
+      - name: Build (Windows)
+        shell: powershell
+        run: |
+          g++ -std=c++17 -O2 yogeshwari_encrypter_kavi.cpp -o yogeshwari_encrypter_kavi.exe
+      - name: Smoke test (non-interactive)
+        shell: powershell
+        run: |
+          $in = "abyss`nB16`n5`n"; $in | .\yogeshwari_encrypter_kavi.exe

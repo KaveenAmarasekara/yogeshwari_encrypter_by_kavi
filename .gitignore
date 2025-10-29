@@ -1,0 +1,25 @@
+# Build artifacts
+*.exe
+*.exe~
+*.o
+*.obj
+*.tmp
+*.bak
+
+# Generated images/audio
+*.bmp
+*.png
+*.wav
+
+# Editor folders
+.vscode/
+*.code-workspace
+
+# Windows
+Thumbs.db
+
+# PowerShell
+*.ps1.xml
+
+# Logs
+*.log
