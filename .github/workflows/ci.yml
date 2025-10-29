@@ -23,10 +23,19 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install MinGW (Chocolatey)
-        shell: powershell
-        run: |
-          choco install mingw -y || true
+    - name: Install MinGW (Chocolatey)
+    shell: powershell
+    run: |
+      # Use PowerShell-friendly logic: check choco exists then install; do not fail the job if unavailable
+      if (Get-Command choco -ErrorAction SilentlyContinue) {
+        try {
+          choco install mingw -y
+        } catch {
+          Write-Host "choco install failed; continuing without MinGW."
+        }
+      } else {
+        Write-Host "choco not found on runner; skipping MinGW install."
+      }
       - name: Build (Windows)
         shell: powershell
         run: |
