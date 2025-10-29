@@ -23,7 +23,8 @@ jobs:
           path: yogeshwari_encrypter_kavi
       - name: Smoke test (non-interactive)
         run: |
-          printf "abyss\nB16\n5\n" | ./yogeshwari_encrypter_kavi
+          # Use deterministic non-interactive CI mode instead of piping interactive input
+          ./yogeshwari_encrypter_kavi --ci --ci-text "Smoke test"
       - name: Full pipeline round-trip test (Ubuntu)
         run: |
           TMPMSG="Hello from CI pipeline test"
@@ -71,7 +72,8 @@ jobs:
       - name: Smoke test (non-interactive)
         shell: powershell
         run: |
-          $in = "abyss`nB16`n5`n"; $in | .\yogeshwari_encrypter_kavi.exe
+          # Use deterministic non-interactive CI mode instead of piping interactive input
+          .\yogeshwari_encrypter_kavi.exe --ci --ci-text "Smoke test"
       - name: Full pipeline round-trip test (Windows)
         shell: powershell
         run: |
